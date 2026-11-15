@@ -9,6 +9,7 @@ using XpBro.Api.Services;
 //TODO: Add Seq sink maybe
 //TODO: Add separate DI file
 //TODO: Add try catch in program.cs with logging
+//TODO: models as records
 
 var builder = WebApplication.CreateBuilder(args);
 
