@@ -1,4 +1,4 @@
-﻿namespace Xpbro.Api.Services;
+﻿namespace XpBro.Api.Services;
 
 public sealed class PasswordService
 {

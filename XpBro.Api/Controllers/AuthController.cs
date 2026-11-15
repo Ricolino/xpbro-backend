@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Xpbro.Api.Services;
 using XpBro.Api.Repositories;
 using XpBro.Api.Services;
 

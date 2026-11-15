@@ -1,4 +1,6 @@
-using Xpbro.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using XpBro.Api.Repositories;
 using XpBro.Api.Services;
 
@@ -30,16 +32,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
             ValidateLifetime = true,
 
-            ValidIssuer =
-                builder.Configuration["Jwt:Issuer"],
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
 
-            ValidAudience =
-                builder.Configuration["Jwt:Audience"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
 
-            IssuerSigningKey =
-                new SymmetricSecurityKey(
-                    Encoding.UTF8.GetBytes(
-                        builder.Configuration["Jwt:Key"]!))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
 });
 
@@ -61,4 +58,4 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.Run();
+await app.RunAsync();
