@@ -17,13 +17,13 @@ public sealed class RoleRepository : IRoleRepository
 
     public async Task<List<string>> GetRoles(Guid userId)
     {
-        var roles = new List<string>();
+        List<string> roles = [];
 
-        await using var connection = CreateConnection();
+        await using NpgsqlConnection connection = CreateConnection();
 
         await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
 
         command.CommandText =
         """
@@ -38,7 +38,7 @@ public sealed class RoleRepository : IRoleRepository
 
         command.Parameters.AddWithValue("userId", userId);
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())
         {
@@ -50,11 +50,11 @@ public sealed class RoleRepository : IRoleRepository
 
     public async Task<bool> HasRole(Guid userId, string roleName)
     {
-        await using var connection = CreateConnection();
+        await using NpgsqlConnection connection = CreateConnection();
 
         await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
 
         command.CommandText =
         """
@@ -73,18 +73,18 @@ public sealed class RoleRepository : IRoleRepository
 
         command.Parameters.AddWithValue("roleName", roleName);
 
-        var count = (long)(await command.ExecuteScalarAsync())!;
+        long count = (long)(await command.ExecuteScalarAsync())!;
 
         return count > 0;
     }
 
     public async Task AssignRole(Guid userId, string roleName)
     {
-        await using var connection = CreateConnection();
+        await using NpgsqlConnection connection = CreateConnection();
 
         await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
 
         command.CommandText =
         """
@@ -114,11 +114,11 @@ public sealed class RoleRepository : IRoleRepository
 
     public async Task RemoveRole(Guid userId, string roleName)
     {
-        await using var connection = CreateConnection();
+        await using NpgsqlConnection connection = CreateConnection();
 
         await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
 
         command.CommandText =
         """
@@ -142,13 +142,13 @@ public sealed class RoleRepository : IRoleRepository
 
     public async Task<List<string>> GetAllRoles()
     {
-        var roles = new List<string>();
+        List<string> roles = [];
 
-        await using var connection = CreateConnection();
+        await using NpgsqlConnection connection = CreateConnection();
 
         await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
 
         command.CommandText =
         """
@@ -157,7 +157,7 @@ public sealed class RoleRepository : IRoleRepository
         order by name
         """;
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())
         {
@@ -165,5 +165,79 @@ public sealed class RoleRepository : IRoleRepository
         }
 
         return roles;
+    }
+
+    public async Task<Dictionary<Guid, List<string>>> GetRolesForUsers(IEnumerable<Guid> userIds)
+    {
+        List<Guid> ids = [.. userIds];
+
+        Dictionary<Guid, List<string>> result = ids.ToDictionary(x => x, _ => new List<string>());
+
+        if (ids.Count == 0)
+        {
+            return result;
+        }
+
+        await using NpgsqlConnection connection = CreateConnection();
+
+        await connection.OpenAsync();
+
+        await using NpgsqlCommand command = connection.CreateCommand();
+
+        command.CommandText =
+        """
+    select
+        ur.user_id,
+        r.name
+
+    from xpbro.user_roles ur
+
+    inner join xpbro.roles r
+        on r.id = ur.role_id
+
+    where ur.user_id = any(@userIds)
+    """;
+
+        command.Parameters.AddWithValue("userIds", ids.ToArray());
+
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            Guid userId = reader.GetGuid(0);
+
+            string role = reader.GetString(1);
+
+            result[userId].Add(role);
+        }
+
+        return result;
+    }
+
+    public async Task<int> CountUsersInRole(string roleName)
+    {
+        await using NpgsqlConnection connection = CreateConnection();
+
+        await connection.OpenAsync();
+
+        await using NpgsqlCommand command = connection.CreateCommand();
+
+        command.CommandText =
+        """
+    select count(*)
+
+    from xpbro.user_roles ur
+
+    inner join xpbro.roles r
+        on r.id = ur.role_id
+
+    where r.name = @role
+    """;
+
+        command.Parameters.AddWithValue("role", roleName);
+
+        long result = (long)(await command.ExecuteScalarAsync())!;
+
+        return (int)result;
     }
 }

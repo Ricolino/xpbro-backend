@@ -286,6 +286,30 @@ public sealed class UserRepository : IUserRepository
         await command.ExecuteNonQueryAsync();
     }
 
+    public async Task UpdateEmail(Guid id, string email)
+    {
+        await using var connection = CreateConnection();
+
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+
+        command.CommandText =
+        """
+    update xpbro.users
+    set
+        email = @email,
+        email_confirmed = false
+    where id = @id
+    """;
+
+        command.Parameters.AddWithValue("id", id);
+
+        command.Parameters.AddWithValue("email", email);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
     public async Task<bool> AnyAdminsExist()
     {
         await using var connection = CreateConnection();
@@ -334,5 +358,24 @@ public sealed class UserRepository : IUserRepository
 
             IsActive = reader.GetBoolean(7)
         };
+    }
+
+    public async Task Delete(Guid id)
+    {
+        await using NpgsqlConnection connection = CreateConnection();
+
+        await connection.OpenAsync();
+
+        await using NpgsqlCommand command = connection.CreateCommand();
+
+        command.CommandText =
+        """
+    delete from xpbro.users
+    where id = @id
+    """;
+
+        command.Parameters.AddWithValue("id", id);
+
+        await command.ExecuteNonQueryAsync();
     }
 }

@@ -11,4 +11,8 @@ public interface IRoleRepository
     Task RemoveRole(Guid userId, string roleName);
 
     Task<List<string>> GetAllRoles();
+
+    Task<Dictionary<Guid, List<string>>> GetRolesForUsers(IEnumerable<Guid> userIds);
+
+    Task<int> CountUsersInRole(string roleName);
 }

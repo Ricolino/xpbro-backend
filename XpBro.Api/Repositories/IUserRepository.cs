@@ -13,6 +13,9 @@ public interface IUserRepository
     Task Disable(Guid id);
     Task ConfirmEmail(Guid id);
     Task UpdatePassword(Guid id, string passwordHash);
+    Task UpdateEmail(Guid id, string email);
+    Task Delete(Guid id);
+
 
     Task<bool> AnyAdminsExist();
 }

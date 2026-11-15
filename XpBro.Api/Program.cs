@@ -10,8 +10,10 @@ using XpBro.Api.Services;
 //TODO: Add separate DI file
 //TODO: Add try catch in program.cs with logging
 //TODO: models as records
+//TODO: remove .netxxx from bin
+//TODO: Add separate project for DI for repo
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 ConfigurationManager configuration = builder.Configuration;
 
@@ -28,14 +30,11 @@ builder.Services.AddHttpContextAccessor();
 //
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(
-        "frontend",
+    options.AddPolicy("frontend",
         policy =>
         {
             policy
-                .WithOrigins(
-                    "http://localhost:5173",
-                    "https://app.xpbro.com")
+                .WithOrigins("http://localhost:5173", "https://app.xpbro.com")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
@@ -50,14 +49,11 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 //
 // AUTHENTICATION
 //
-builder.Services
-    .AddAuthentication(options =>
+builder.Services.AddAuthentication(options =>
     {
-        options.DefaultAuthenticateScheme =
-            JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
 
-        options.DefaultChallengeScheme =
-            JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
 
     //
@@ -65,48 +61,31 @@ builder.Services
     //
     .AddJwtBearer(options =>
     {
-        options.TokenValidationParameters =
-            new TokenValidationParameters
-            {
-                ValidateIssuer = true,
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = configuration["Jwt:Issuer"],
 
-                ValidateAudience = true,
+            ValidAudience = configuration["Jwt:Audience"],
 
-                ValidateLifetime = true,
-
-                ValidateIssuerSigningKey = true,
-
-                ValidIssuer =
-                    configuration["Jwt:Issuer"],
-
-                ValidAudience =
-                    configuration["Jwt:Audience"],
-
-                IssuerSigningKey =
-                    new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(
-                            configuration["Jwt:Key"]!
-                        ))
-            };
-    })
-
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!))
+        };
+    });
+//TODO: Add Google
     //
     // GOOGLE OAUTH
     //
-    .AddCookie()
-    .AddGoogle(options =>
-    {
-        options.ClientId =
-            configuration["Google:ClientId"]!;
-
-        options.ClientSecret =
-            configuration["Google:ClientSecret"]!;
-
-        options.CallbackPath =
-            "/signin-google";
-
-        options.SaveTokens = true;
-    });
+    //.AddCookie()
+    //.AddGoogle(options =>
+    //{
+    //    options.ClientId = configuration["Google:ClientId"]!;
+    //    options.ClientSecret = configuration["Google:ClientSecret"]!;
+    //    options.CallbackPath = "/signin-google";
+    //    options.SaveTokens = true;
+    //});
 
 
 //
@@ -117,7 +96,7 @@ builder.Services.AddAuthorization();
 //
 // SERVICES
 //
-builder.Services.AddScoped<PasswordService>();
+builder.Services.AddScoped<IPasswordService, PasswordService>();
 
 builder.Services.AddScoped<IJwtService, JwtService>();
 
@@ -139,7 +118,7 @@ builder.Services.AddScoped<ITokenRepository, TokenRepository>();
 //
 builder.Services.AddScoped<IAdminSeederService, AdminSeederService>();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -173,7 +152,7 @@ app.MapControllers();
 //
 using (var scope = app.Services.CreateScope())
 {
-    var seeder = scope.ServiceProvider.GetRequiredService<IAdminSeederService>();
+    IAdminSeederService seeder = scope.ServiceProvider.GetRequiredService<IAdminSeederService>();
 
     await seeder.Seed();
 }
