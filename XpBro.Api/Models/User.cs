@@ -1,4 +1,4 @@
-﻿namespace Xpbro.Api.Models;
+﻿namespace XpBro.Api.Models;
 
 public sealed class User
 {
