@@ -1,5 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+﻿using System.Security.Claims;
 
 namespace XpBro.Api.Services;
 
@@ -14,14 +13,26 @@ public sealed class CurrentUserService : ICurrentUserService
 
     public Guid UserId()
     {
-        var value = _http.HttpContext?.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        string? value = _http.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-        return Guid.Parse(value!);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new UnauthorizedAccessException("User id claim is missing.");
+        }
+
+        return Guid.Parse(value);
     }
 
     public string Email()
     {
-        return _http.HttpContext?.User.FindFirstValue(JwtRegisteredClaimNames.Email)! ?? string.Empty;
+        string? value = _http.HttpContext?.User.FindFirstValue(ClaimTypes.Email);
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new UnauthorizedAccessException("Email claim is missing.");
+        }
+
+        return value;
     }
 
     public bool IsAuthenticated()
