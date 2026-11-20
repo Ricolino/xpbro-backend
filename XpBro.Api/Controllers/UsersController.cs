@@ -107,14 +107,18 @@ public sealed class UsersController : ControllerBase
     [HttpPut("{id:guid}/disable")]
     public async Task<IActionResult> DisableUser(Guid id)
     {
+        if (await _roles.HasRole(id, "Admin"))
+        {
+            return BadRequest("Cannot disable admin user.");
+        }
+
         await _users.Disable(id);
 
         return Ok();
     }
 
     [HttpPost("{id:guid}/roles")]
-    public async Task<IActionResult> AssignRole(Guid id,
-    AssignRoleRequest request)
+    public async Task<IActionResult> AssignRole(Guid id, AssignRoleRequest request)
     {
         await _roles.AssignRole(id, request.Role);
 
