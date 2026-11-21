@@ -42,7 +42,6 @@ builder.Services.AddCors(options =>
         });
 });
 
-builder.Services.AddScoped<PasswordService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
@@ -113,6 +112,8 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 
 builder.Services.AddScoped<ITokenRepository, TokenRepository>();
+
+builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 
 //
 // ADMIN SEEDER

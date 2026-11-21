@@ -12,5 +12,7 @@ public sealed class MeResponse
 
     public bool EmailConfirmed { get; set; }
 
+    public bool IsActive { get; set; }
+
     public List<string> Roles { get; set; } = [];
 }

@@ -17,8 +17,7 @@ public sealed class TokenRepository : ITokenRepository
         return new NpgsqlConnection(_connectionString);
     }
 
-    public async Task Save(
-    RefreshToken token)
+    public async Task Save(RefreshToken token)
     {
         await using var connection = CreateConnection();
 
@@ -33,14 +32,16 @@ public sealed class TokenRepository : ITokenRepository
         id,
         user_id,
         token,
-        expires_at
+        expires_at,
+        created_at
     )
     values
     (
         @id,
         @userId,
         @token,
-        @expiresAt
+        @expiresAt,
+        now()
     )
     """;
 

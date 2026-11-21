@@ -17,23 +17,29 @@ public sealed class AuthController : ControllerBase
     private readonly IUserRepository _users;
     private readonly IRoleRepository _roles;
     private readonly ITokenRepository _tokens;
+    private readonly ISessionRepository _sessions;
+    private readonly ICurrentUserService _currentUser;
     private readonly IJwtService _jwt;
     private readonly IRefreshTokenService _refresh;
-    private readonly PasswordService _passwords;
+    private readonly IPasswordService _passwords;
     private readonly IConfiguration _configuration;
 
     public AuthController(
         IUserRepository users,
         IRoleRepository roles,
         ITokenRepository tokens,
+        ISessionRepository sessions,
+        ICurrentUserService currentUser,
         IJwtService jwt,
         IRefreshTokenService refresh,
-        PasswordService passwords,
+        IPasswordService passwords,
         IConfiguration configuration)
     {
         _users = users;
         _roles = roles;
         _tokens = tokens;
+        _sessions = sessions;
+        _currentUser = currentUser;
         _jwt = jwt;
         _refresh = refresh;
         _passwords = passwords;
@@ -104,17 +110,23 @@ public sealed class AuthController : ControllerBase
 
         string accessToken = _jwt.Generate(user.Id, user.Email, roles);
 
-        string refreshToken = _refresh.Generate();
-
-        await _tokens.Save(new RefreshToken
+        var refreshToken = new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Token = refreshToken,
+            Token = _refresh.Generate(),
             ExpiresAt = DateTime.UtcNow.AddDays(30)
-        });
+        };
 
-        AppendRefreshCookie(refreshToken);
+        await _tokens.Save(refreshToken);
+
+        await _sessions.Create(
+        user.Id,
+        refreshToken.Id,
+        HttpContext.Connection.RemoteIpAddress?.ToString(),
+        Request.Headers.UserAgent.ToString());
+
+        SetRefreshCookie(refreshToken.Token);
 
         return Ok(new LoginResponse
         {
@@ -123,60 +135,71 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
-    public async Task<ActionResult<LoginResponse>> Refresh()
+    public async Task<IActionResult> Refresh()
     {
-        string? cookie = Request.Cookies["refreshToken"];
-
-        if (string.IsNullOrWhiteSpace(cookie))
+        if (!Request.Cookies.TryGetValue("refreshToken", out var cookie))
         {
             return Unauthorized();
         }
 
-        RefreshToken? token = await _tokens.Get(cookie);
+        var storedToken = await _tokens.Get(cookie);
 
-        if (token == null)
+        if (storedToken is null)
         {
             return Unauthorized();
         }
 
-        if (token.RevokedAt != null)
+        if (storedToken.RevokedAt is not null)
         {
             return Unauthorized();
         }
 
-        if (token.ExpiresAt < DateTime.UtcNow)
+        if (storedToken.ExpiresAt <= DateTime.UtcNow)
         {
             return Unauthorized();
         }
 
-        User? user = await _users.GetById(token.UserId);
+        var user = await _users.GetById(storedToken.UserId);
 
-        if (user == null)
+        if (user is null)
         {
             return Unauthorized();
         }
 
-        List<string> roles = await _roles.GetRoles(user.Id);
+        var roles = await _roles.GetRoles(user.Id);
 
-        string accessToken = _jwt.Generate(user.Id, user.Email, roles);
+        var accessToken = _jwt.Generate(
+            user.Id,
+            user.Email,
+            roles);
 
-        string newRefreshToken = _refresh.Generate();
-
-        await _tokens.Replace(cookie, newRefreshToken);
-
-        await _tokens.Save(new RefreshToken
+        var newRefreshToken = new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Token = newRefreshToken,
+            Token = _refresh.Generate(),
             ExpiresAt = DateTime.UtcNow.AddDays(30)
-        });
+        };
 
-        AppendRefreshCookie(newRefreshToken);
+        await _tokens.Replace(
+            storedToken.Token,
+            newRefreshToken.Token);
 
-        return Ok(new LoginResponse
+        await _tokens.Save(newRefreshToken);
+
+        await _sessions.RevokeByRefreshTokenId(storedToken.Id);
+
+        await _sessions.Create(
+            user.Id,
+            newRefreshToken.Id,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
+        SetRefreshCookie(newRefreshToken.Token);
+
+        return Ok(new
         {
-            AccessToken = accessToken
+            accessToken
         });
     }
 
@@ -184,14 +207,20 @@ public sealed class AuthController : ControllerBase
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
-        string? token = Request.Cookies["refreshToken"];
-
-        if (!string.IsNullOrWhiteSpace(token))
+        if (!Request.Cookies.TryGetValue("refreshToken", out var token))
         {
-            await _tokens.Revoke(token);
+            return Ok();
         }
 
-        Response.Cookies.Delete("refreshToken");
+        RefreshToken? storedToken = await _tokens.Get(token);
+
+        if (storedToken is not null)
+        {
+            await _sessions.RevokeByRefreshTokenId(storedToken.Id);
+        }
+        await _tokens.Revoke(token);
+
+        RemoveRefreshCookie();
 
         return Ok();
     }
@@ -200,11 +229,13 @@ public sealed class AuthController : ControllerBase
     [HttpPost("logout-all")]
     public async Task<IActionResult> LogoutAll()
     {
-        Guid userId = Guid.Parse(User.FindFirstValue("sub")!);
+        Guid userId = _currentUser.UserId();
 
         await _tokens.RevokeAll(userId);
 
-        Response.Cookies.Delete("refreshToken");
+        await _sessions.RevokeAll(userId);
+
+        RemoveRefreshCookie();
 
         return Ok();
     }
@@ -269,33 +300,52 @@ public sealed class AuthController : ControllerBase
 
         string accessToken = _jwt.Generate(user.Id, user.Email, roles);
 
-        string refreshToken = _refresh.Generate();
-
-        await _tokens.Save(new RefreshToken
+        var refreshToken = new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Token = refreshToken,
+            Token = _refresh.Generate(),
             ExpiresAt = DateTime.UtcNow.AddDays(30)
-        });
+        };
 
-        AppendRefreshCookie(refreshToken);
+        await _tokens.Save(refreshToken);
+
+        await _sessions.Create(
+            user.Id,
+            refreshToken.Id,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString());
+
+        SetRefreshCookie(refreshToken.Token);
 
         string? frontendUrl = _configuration["Frontend:Url"];
 
         return Redirect($"{frontendUrl}/auth/callback?token={accessToken}");
     }
 
-    private void AppendRefreshCookie(
-    string refreshToken)
+    private void SetRefreshCookie(string token)
     {
-        Response.Cookies.Append("refreshToken", refreshToken,
+        Response.Cookies.Append(
+            "refreshToken",
+            token,
             new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.None,
                 Expires = DateTimeOffset.UtcNow.AddDays(30)
+            });
+    }
+
+    private void RemoveRefreshCookie()
+    {
+        Response.Cookies.Delete(
+            "refreshToken",
+            new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None
             });
     }
 }

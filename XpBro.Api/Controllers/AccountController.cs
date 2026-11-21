@@ -18,17 +18,21 @@ public sealed class AccountController : ControllerBase
 
     private readonly ICurrentUserService _currentUser;
 
-    private readonly PasswordService _passwords;
+    private readonly ISessionRepository _sessions;
+
+    private readonly IPasswordService _passwords;
 
     public AccountController(
         IUserRepository users,
         IRoleRepository roles,
         ICurrentUserService currentUser,
-        PasswordService passwords)
+        ISessionRepository sessions,
+        IPasswordService passwords)
     {
         _users = users;
         _roles = roles;
         _currentUser = currentUser;
+        _sessions = sessions;
         _passwords = passwords;
     }
 
@@ -53,6 +57,7 @@ public sealed class AccountController : ControllerBase
             FirstName = user.FirstName,
             LastName = user.LastName,
             EmailConfirmed = user.EmailConfirmed,
+            IsActive = user.IsActive,
             Roles = roles
         });
     }
@@ -106,5 +111,49 @@ public sealed class AccountController : ControllerBase
         await _users.UpdatePassword(user.Id, hash);
 
         return Ok();
+    }
+
+    [HttpGet("sessions")]
+    public async Task<IActionResult> GetSessions()
+    {
+        var userId = _currentUser.UserId();
+
+        var sessions = await _sessions.GetByUserId(userId);
+
+        var result = sessions
+            .OrderByDescending(x => x.LastSeenAt)
+            .Select(x => new
+            {
+                x.Id,
+                x.IpAddress,
+                x.UserAgent,
+                x.CreatedAt,
+                x.LastSeenAt,
+                IsActive = x.RevokedAt is null
+            });
+
+        return Ok(result);
+    }
+
+    [HttpDelete("sessions/{id:guid}")]
+    public async Task<IActionResult> DeleteSession(Guid id)
+    {
+        var userId = _currentUser.UserId();
+
+        var session = await _sessions.Get(id);
+
+        if (session is null)
+        {
+            return NotFound();
+        }
+
+        if (session.UserId != userId)
+        {
+            return Forbid();
+        }
+
+        await _sessions.Revoke(id);
+
+        return NoContent();
     }
 }
