@@ -34,8 +34,9 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy
-                .WithOrigins("http://localhost:5173", "https://app.xpbro.com",
-                "https://yellow-river-06800d20f.6.azurestaticapps.net")
+                .WithOrigins("http://localhost:5173", "https://xpbro.com",
+                "https://www.xpbro.com"/*,
+                "https://yellow-river-06800d20f.6.azurestaticapps.net"*/)
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
