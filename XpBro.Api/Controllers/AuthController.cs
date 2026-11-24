@@ -245,7 +245,7 @@ public sealed class AuthController : ControllerBase
     {
         AuthenticationProperties properties = new()
         {
-            RedirectUri = "/api/auth/google/callback"
+            RedirectUri = Url.Action(nameof(GoogleCallback))
         };
 
         return Challenge(properties, GoogleDefaults.AuthenticationScheme);
@@ -255,6 +255,11 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> GoogleCallback()
     {
         AuthenticateResult authenticate = await HttpContext.AuthenticateAsync("ExternalCookie");
+
+        if (!authenticate.Succeeded || authenticate.Principal == null)
+        {
+            return Unauthorized();
+        }
 
         ClaimsPrincipal? principal = authenticate.Principal;
 

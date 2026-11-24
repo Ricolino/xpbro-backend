@@ -54,6 +54,9 @@ builder.Services.AddAuthentication(options =>
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
 
         options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+
+        // Temporary cookie for Google OAuth
+        options.DefaultSignInScheme = "ExternalCookie";
     })
 
     //
@@ -78,7 +81,14 @@ builder.Services.AddAuthentication(options =>
     //
     // GOOGLE OAUTH
     //
-    .AddCookie("ExternalCookie")
+    .AddCookie("ExternalCookie", options =>
+    {
+        options.Cookie.Name = ".XpBro.External";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+    })
     .AddGoogle(options =>
     {
         options.ClientId = configuration["Google:ClientId"]!;
