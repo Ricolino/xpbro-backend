@@ -296,12 +296,12 @@ public sealed class UserRepository : IUserRepository
 
         command.CommandText =
         """
-    update xpbro.users
-    set
-        email = @email,
-        email_confirmed = false
-    where id = @id
-    """;
+        update xpbro.users
+        set
+            email = @email,
+            email_confirmed = false
+        where id = @id
+        """;
 
         command.Parameters.AddWithValue("id", id);
 
@@ -370,9 +370,9 @@ public sealed class UserRepository : IUserRepository
 
         command.CommandText =
         """
-    delete from xpbro.users
-    where id = @id
-    """;
+        delete from xpbro.users
+        where id = @id
+        """;
 
         command.Parameters.AddWithValue("id", id);
 

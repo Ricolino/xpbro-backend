@@ -6,11 +6,11 @@ using XpBro.Api.Seeders;
 using XpBro.Api.Services;
 
 //TODO: Add Serilog Logging
+//TODO: Add Azure logging maybe
 //TODO: Add Seq sink maybe
 //TODO: Add separate DI file
 //TODO: Add try catch in program.cs with logging
 //TODO: models as records
-//TODO: remove .netxxx from bin
 //TODO: Add separate project for DI for repo
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -35,8 +35,7 @@ builder.Services.AddCors(options =>
         {
             policy
                 .WithOrigins("http://localhost:5173", "https://xpbro.com",
-                "https://www.xpbro.com"/*,
-                "https://yellow-river-06800d20f.6.azurestaticapps.net"*/)
+                "https://www.xpbro.com")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
@@ -74,20 +73,19 @@ builder.Services.AddAuthentication(options =>
 
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!))
         };
-    });
-//TODO: Add Google
+    })
+
     //
     // GOOGLE OAUTH
     //
-    //.AddCookie()
-    //.AddGoogle(options =>
-    //{
-    //    options.ClientId = configuration["Google:ClientId"]!;
-    //    options.ClientSecret = configuration["Google:ClientSecret"]!;
-    //    options.CallbackPath = "/signin-google";
-    //    options.SaveTokens = true;
-    //});
-
+    .AddCookie()
+    .AddGoogle(options =>
+    {
+        options.ClientId = configuration["Google:ClientId"]!;
+        options.ClientSecret = configuration["Google:ClientSecret"]!;
+        options.CallbackPath = "/signin-google";
+        options.SaveTokens = true;
+    });
 
 //
 // AUTHORIZATION
@@ -129,10 +127,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-//
-// HTTPS
-//
-// todo app.UseHttpsRedirection();
 
 //
 // CORS
