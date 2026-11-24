@@ -254,7 +254,7 @@ public sealed class AuthController : ControllerBase
     [HttpGet("google/callback")]
     public async Task<IActionResult> GoogleCallback()
     {
-        AuthenticateResult authenticate = await HttpContext.AuthenticateAsync(GoogleDefaults.AuthenticationScheme);
+        AuthenticateResult authenticate = await HttpContext.AuthenticateAsync("ExternalCookie");
 
         ClaimsPrincipal? principal = authenticate.Principal;
 

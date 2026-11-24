@@ -78,12 +78,13 @@ builder.Services.AddAuthentication(options =>
     //
     // GOOGLE OAUTH
     //
-    .AddCookie()
+    .AddCookie("ExternalCookie")
     .AddGoogle(options =>
     {
         options.ClientId = configuration["Google:ClientId"]!;
         options.ClientSecret = configuration["Google:ClientSecret"]!;
         options.CallbackPath = "/signin-google";
+        options.SignInScheme = "ExternalCookie";
         options.SaveTokens = true;
     });
 
