@@ -12,11 +12,11 @@
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.15" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.15" />
-    <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="Roslynator.Analyzers" Version="5.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.36.0.15337">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -27,7 +27,14 @@
 
   <ItemGroup>
     <Folder Include="Authorization\" />
+    <Folder Include="Helpers\" />
     <Folder Include="Infrastructure\" />
+    <Folder Include="Models\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\XpBro.RepoInterfaces\XpBro.RepoInterfaces.csproj" />
+    <ProjectReference Include="..\XpBro.SupabaseRepo\XpBro.SupabaseRepo.csproj" />
   </ItemGroup>
 
 </Project>

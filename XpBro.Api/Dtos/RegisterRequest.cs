@@ -1,6 +1,6 @@
 ﻿namespace XpBro.Api.Dtos;
 
-public sealed class RegisterRequest
+public sealed record RegisterRequest
 {
     public string Email { get; set; } = "";
 

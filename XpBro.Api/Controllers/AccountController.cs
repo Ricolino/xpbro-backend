@@ -1,54 +1,36 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using XpBro.Api.Dtos;
-using XpBro.Api.Models;
-using XpBro.Api.Repositories;
 using XpBro.Api.Services;
+using XpBro.Models.Domain;
+using XpBro.RepoInterfaces;
 
 namespace XpBro.Api.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/account")]
-public sealed class AccountController : ControllerBase
+public sealed class AccountController(
+    IUserRepository users,
+    IRoleRepository roles,
+    ICurrentUserService currentUser,
+    ISessionRepository sessions,
+    IPasswordService passwords,
+    ILogger<AccountController> logger) : ControllerBase
 {
-    private readonly IUserRepository _users;
-
-    private readonly IRoleRepository _roles;
-
-    private readonly ICurrentUserService _currentUser;
-
-    private readonly ISessionRepository _sessions;
-
-    private readonly IPasswordService _passwords;
-
-    public AccountController(
-        IUserRepository users,
-        IRoleRepository roles,
-        ICurrentUserService currentUser,
-        ISessionRepository sessions,
-        IPasswordService passwords)
-    {
-        _users = users;
-        _roles = roles;
-        _currentUser = currentUser;
-        _sessions = sessions;
-        _passwords = passwords;
-    }
-
     [HttpGet("me")]
     public async Task<ActionResult<MeResponse>> Me()
     {
-        Guid userId = _currentUser.UserId();
+        Guid userId = currentUser.UserId();
 
-        User? user = await _users.GetById(userId);
+        User? user = await users.GetById(userId);
 
         if (user == null)
         {
             return NotFound();
         }
 
-        List<string> roles = await _roles.GetRoles(userId);
+        List<string> myRoles = await roles.GetRoles(userId);
 
         return Ok(new MeResponse
         {
@@ -58,16 +40,16 @@ public sealed class AccountController : ControllerBase
             LastName = user.LastName,
             EmailConfirmed = user.EmailConfirmed,
             IsActive = user.IsActive,
-            Roles = roles
+            Roles = myRoles
         });
     }
 
     [HttpPut("profile")]
     public async Task<IActionResult> UpdateProfile(UpdateProfileRequest request)
     {
-        Guid userId = _currentUser.UserId();
+        Guid userId = currentUser.UserId();
 
-        User? user = await _users.GetById(userId);
+        User? user = await users.GetById(userId);
 
         if (user == null)
         {
@@ -77,7 +59,7 @@ public sealed class AccountController : ControllerBase
         user.FirstName = request.FirstName.Trim();
         user.LastName = request.LastName.Trim();
 
-        await _users.Update(user);
+        await users.Update(user);
 
         return Ok();
     }
@@ -85,9 +67,9 @@ public sealed class AccountController : ControllerBase
     [HttpPut("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
     {
-        Guid userId = _currentUser.UserId();
+        Guid userId = currentUser.UserId();
 
-        User? user = await _users.GetById(userId);
+        User? user = await users.GetById(userId);
 
         if (user == null)
         {
@@ -99,16 +81,16 @@ public sealed class AccountController : ControllerBase
             return BadRequest("Google account.");
         }
 
-        bool valid = _passwords.Verify(request.CurrentPassword, user.PasswordHash);
+        bool valid = passwords.Verify(request.CurrentPassword, user.PasswordHash);
 
         if (!valid)
         {
             return BadRequest("Current password invalid.");
         }
 
-        string hash = _passwords.Hash(request.NewPassword);
+        string hash = passwords.Hash(request.NewPassword);
 
-        await _users.UpdatePassword(user.Id, hash);
+        await users.UpdatePassword(user.Id, hash);
 
         return Ok();
     }
@@ -116,11 +98,11 @@ public sealed class AccountController : ControllerBase
     [HttpGet("sessions")]
     public async Task<IActionResult> GetSessions()
     {
-        var userId = _currentUser.UserId();
+        Guid userId = currentUser.UserId();
 
-        var sessions = await _sessions.GetByUserId(userId);
+        IEnumerable<UserSession> userSessions = await sessions.GetByUserId(userId);
 
-        var result = sessions
+        var result = userSessions
             .OrderByDescending(x => x.LastSeenAt)
             .Select(x => new
             {
@@ -138,9 +120,9 @@ public sealed class AccountController : ControllerBase
     [HttpDelete("sessions/{id:guid}")]
     public async Task<IActionResult> DeleteSession(Guid id)
     {
-        var userId = _currentUser.UserId();
+        Guid userId = currentUser.UserId();
 
-        var session = await _sessions.Get(id);
+        UserSession? session = await sessions.Get(id);
 
         if (session is null)
         {
@@ -152,7 +134,7 @@ public sealed class AccountController : ControllerBase
             return Forbid();
         }
 
-        await _sessions.Revoke(id);
+        await sessions.Revoke(id);
 
         return NoContent();
     }

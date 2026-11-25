@@ -1,16 +1,13 @@
-﻿using Npgsql;
-using XpBro.Api.Models;
+﻿using Microsoft.Extensions.Configuration;
+using Npgsql;
+using XpBro.Models.Domain;
+using XpBro.RepoInterfaces;
 
-namespace XpBro.Api.Repositories;
+namespace XpBro.SupabaseRepo.Repos;
 
-public sealed class SessionRepository : ISessionRepository
+public sealed class SessionRepository(IConfiguration configuration) : ISessionRepository
 {
-    private readonly string _connectionString;
-
-    public SessionRepository(IConfiguration configuration)
-    {
-        _connectionString = configuration.GetConnectionString("Db")!;
-    }
+    private readonly string _connectionString = configuration.GetConnectionString("Db")!;
 
     public async Task Create(Guid userId, Guid refreshTokenId, string? ipAddress, string? userAgent)
     {
@@ -69,7 +66,7 @@ public sealed class SessionRepository : ISessionRepository
             order by last_seen_at desc;
             """;
 
-        var sessions = new List<UserSession>();
+        List<UserSession> sessions = [];
 
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();

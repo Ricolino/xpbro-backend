@@ -4,52 +4,30 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using XpBro.Api.Dtos;
-using XpBro.Api.Models;
-using XpBro.Api.Repositories;
 using XpBro.Api.Services;
+using XpBro.Models.Domain;
+using XpBro.RepoInterfaces;
 
 namespace XpBro.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController : ControllerBase
+public sealed class AuthController(
+    IUserRepository users,
+    IRoleRepository roles,
+    ITokenRepository tokens,
+    ISessionRepository sessions,
+    ICurrentUserService currentUser,
+    IJwtService jwt,
+    IRefreshTokenService refresh,
+    IPasswordService passwords,
+    IConfiguration configuration,
+    ILogger<AuthController> logger) : ControllerBase
 {
-    private readonly IUserRepository _users;
-    private readonly IRoleRepository _roles;
-    private readonly ITokenRepository _tokens;
-    private readonly ISessionRepository _sessions;
-    private readonly ICurrentUserService _currentUser;
-    private readonly IJwtService _jwt;
-    private readonly IRefreshTokenService _refresh;
-    private readonly IPasswordService _passwords;
-    private readonly IConfiguration _configuration;
-
-    public AuthController(
-        IUserRepository users,
-        IRoleRepository roles,
-        ITokenRepository tokens,
-        ISessionRepository sessions,
-        ICurrentUserService currentUser,
-        IJwtService jwt,
-        IRefreshTokenService refresh,
-        IPasswordService passwords,
-        IConfiguration configuration)
-    {
-        _users = users;
-        _roles = roles;
-        _tokens = tokens;
-        _sessions = sessions;
-        _currentUser = currentUser;
-        _jwt = jwt;
-        _refresh = refresh;
-        _passwords = passwords;
-        _configuration = configuration;
-    }
-
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request)
     {
-        User? existing = await _users.GetByEmail(request.Email);
+        User? existing = await users.GetByEmail(request.Email);
 
         if (existing != null)
         {
@@ -60,16 +38,16 @@ public sealed class AuthController : ControllerBase
         {
             Id = Guid.NewGuid(),
             Email = request.Email.Trim(),
-            PasswordHash = _passwords.Hash(request.Password),
+            PasswordHash = passwords.Hash(request.Password),
             FirstName = request.FirstName,
             LastName = request.LastName,
             EmailConfirmed = false,
             IsActive = true
         };
 
-        await _users.Create(user);
+        await users.Create(user);
 
-        await _roles.AssignRole(user.Id, "User");
+        await roles.AssignRole(user.Id, "User");
 
         return Ok();
     }
@@ -77,7 +55,7 @@ public sealed class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<LoginResponse>> Login(LoginRequest request)
     {
-        User? user = await _users.GetByEmail(request.Email);
+        User? user = await users.GetByEmail(request.Email);
 
         if (user == null)
         {
@@ -99,28 +77,26 @@ public sealed class AuthController : ControllerBase
             return Unauthorized();
         }
 
-        bool passwordValid = _passwords.Verify(request.Password, user.PasswordHash);
+        bool passwordValid = passwords.Verify(request.Password, user.PasswordHash);
 
         if (!passwordValid)
         {
             return Unauthorized();
         }
 
-        List<string> roles = await _roles.GetRoles(user.Id);
+        string accessToken = jwt.Generate(user.Id, user.Email, await roles.GetRoles(user.Id));
 
-        string accessToken = _jwt.Generate(user.Id, user.Email, roles);
-
-        var refreshToken = new RefreshToken
+        RefreshToken refreshToken = new()
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Token = _refresh.Generate(),
+            Token = refresh.Generate(),
             ExpiresAt = DateTime.UtcNow.AddDays(30)
         };
 
-        await _tokens.Save(refreshToken);
+        await tokens.Save(refreshToken);
 
-        await _sessions.Create(
+        await sessions.Create(
         user.Id,
         refreshToken.Id,
         HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -128,10 +104,7 @@ public sealed class AuthController : ControllerBase
 
         SetRefreshCookie(refreshToken.Token);
 
-        return Ok(new LoginResponse
-        {
-            AccessToken = accessToken
-        });
+        return Ok(new LoginResponse { AccessToken = accessToken });
     }
 
     [HttpPost("refresh")]
@@ -142,7 +115,7 @@ public sealed class AuthController : ControllerBase
             return Unauthorized();
         }
 
-        var storedToken = await _tokens.Get(cookie);
+        RefreshToken? storedToken = await tokens.Get(cookie);
 
         if (storedToken is null)
         {
@@ -159,37 +132,33 @@ public sealed class AuthController : ControllerBase
             return Unauthorized();
         }
 
-        var user = await _users.GetById(storedToken.UserId);
+        User? user = await users.GetById(storedToken.UserId);
 
         if (user is null)
         {
             return Unauthorized();
         }
 
-        var roles = await _roles.GetRoles(user.Id);
-
-        var accessToken = _jwt.Generate(
+        string accessToken = jwt.Generate(
             user.Id,
             user.Email,
-            roles);
+            await roles.GetRoles(user.Id));
 
-        var newRefreshToken = new RefreshToken
+        RefreshToken newRefreshToken = new()
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Token = _refresh.Generate(),
+            Token = refresh.Generate(),
             ExpiresAt = DateTime.UtcNow.AddDays(30)
         };
 
-        await _tokens.Replace(
-            storedToken.Token,
-            newRefreshToken.Token);
+        await tokens.Replace(storedToken.Token, newRefreshToken.Token);
 
-        await _tokens.Save(newRefreshToken);
+        await tokens.Save(newRefreshToken);
 
-        await _sessions.RevokeByRefreshTokenId(storedToken.Id);
+        await sessions.RevokeByRefreshTokenId(storedToken.Id);
 
-        await _sessions.Create(
+        await sessions.Create(
             user.Id,
             newRefreshToken.Id,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -197,10 +166,7 @@ public sealed class AuthController : ControllerBase
 
         SetRefreshCookie(newRefreshToken.Token);
 
-        return Ok(new
-        {
-            accessToken
-        });
+        return Ok(new { accessToken });
     }
 
     [Authorize]
@@ -212,13 +178,13 @@ public sealed class AuthController : ControllerBase
             return Ok();
         }
 
-        RefreshToken? storedToken = await _tokens.Get(token);
+        RefreshToken? storedToken = await tokens.Get(token);
 
         if (storedToken is not null)
         {
-            await _sessions.RevokeByRefreshTokenId(storedToken.Id);
+            await sessions.RevokeByRefreshTokenId(storedToken.Id);
         }
-        await _tokens.Revoke(token);
+        await tokens.Revoke(token);
 
         RemoveRefreshCookie();
 
@@ -229,11 +195,11 @@ public sealed class AuthController : ControllerBase
     [HttpPost("logout-all")]
     public async Task<IActionResult> LogoutAll()
     {
-        Guid userId = _currentUser.UserId();
+        Guid userId = currentUser.UserId();
 
-        await _tokens.RevokeAll(userId);
+        await tokens.RevokeAll(userId);
 
-        await _sessions.RevokeAll(userId);
+        await sessions.RevokeAll(userId);
 
         RemoveRefreshCookie();
 
@@ -281,7 +247,7 @@ public sealed class AuthController : ControllerBase
             return Unauthorized();
         }
 
-        User? user = await _users.GetByEmail(email);
+        User? user = await users.GetByEmail(email);
 
         if (user == null)
         {
@@ -296,26 +262,24 @@ public sealed class AuthController : ControllerBase
                 IsActive = true
             };
 
-            await _users.Create(user);
+            await users.Create(user);
 
-            await _roles.AssignRole(user.Id, "User");
+            await roles.AssignRole(user.Id, "User");
         }
 
-        List<string> roles = await _roles.GetRoles(user.Id);
+        string accessToken = jwt.Generate(user.Id, user.Email, await roles.GetRoles(user.Id));
 
-        string accessToken = _jwt.Generate(user.Id, user.Email, roles);
-
-        var refreshToken = new RefreshToken
+        RefreshToken refreshToken = new()
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Token = _refresh.Generate(),
+            Token = refresh.Generate(),
             ExpiresAt = DateTime.UtcNow.AddDays(30)
         };
 
-        await _tokens.Save(refreshToken);
+        await tokens.Save(refreshToken);
 
-        await _sessions.Create(
+        await sessions.Create(
             user.Id,
             refreshToken.Id,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -323,7 +287,7 @@ public sealed class AuthController : ControllerBase
 
         SetRefreshCookie(refreshToken.Token);
 
-        string? frontendUrl = _configuration["Frontend:Url"];
+        string? frontendUrl = configuration["Frontend:Url"];
 
         return Redirect($"{frontendUrl}/auth/callback?token={accessToken}");
     }

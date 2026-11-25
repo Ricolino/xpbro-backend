@@ -1,6 +1,6 @@
 ﻿namespace XpBro.Api.Dtos;
 
-public sealed class MeResponse
+public sealed record MeResponse
 {
     public Guid Id { get; set; }
 

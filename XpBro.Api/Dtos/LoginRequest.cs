@@ -1,6 +1,6 @@
 ﻿namespace XpBro.Api.Dtos;
 
-public sealed class LoginRequest
+public sealed record LoginRequest
 {
     public string Email { get; set; } = "";
 

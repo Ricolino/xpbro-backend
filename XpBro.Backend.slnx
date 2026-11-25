@@ -1,3 +1,6 @@
 <Solution>
   <Project Path="XpBro.Api/XpBro.Api.csproj" />
+  <Project Path="XpBro.Models/XpBro.Models.csproj" Id="d48eb64c-90bc-4a7f-9f97-f884b8267b2d" />
+  <Project Path="XpBro.RepoInterfaces/XpBro.RepoInterfaces.csproj" Id="46709f7c-590c-495e-b2e2-0e57eb7640f1" />
+  <Project Path="XpBro.SupabaseRepo/XpBro.SupabaseRepo.csproj" Id="9a7f59df-5ee9-4d77-afd6-8f60640e8449" />
 </Solution>

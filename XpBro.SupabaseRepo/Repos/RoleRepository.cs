@@ -1,14 +1,12 @@
-﻿using Npgsql;
-namespace XpBro.Api.Repositories;
+﻿using Microsoft.Extensions.Configuration;
+using Npgsql;
+using XpBro.RepoInterfaces;
 
-public sealed class RoleRepository : IRoleRepository
+namespace XpBro.SupabaseRepo.Repos;
+
+public sealed class RoleRepository(IConfiguration configuration) : IRoleRepository
 {
-    private readonly string _connectionString;
-
-    public RoleRepository(IConfiguration configuration)
-    {
-        _connectionString = configuration.GetConnectionString("Db")!;
-    }
+    private readonly string _connectionString = configuration.GetConnectionString("Db")!;
 
     private NpgsqlConnection CreateConnection()
     {

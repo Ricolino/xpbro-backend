@@ -1,27 +1,30 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using System.Text;
-using XpBro.Api.Repositories;
+using XpBro.Api;
 using XpBro.Api.Seeders;
-using XpBro.Api.Services;
 
 
-//TODO: Fix Login method in db for google
+//TODO: Fix Login method (email/pass or google) in db for google
 //TODO: What is and where is Account Type - Standard in db
-//TODO: Add Serilog Logging
 //TODO: Add Azure logging maybe
-//TODO: Add Seq sink maybe
-//TODO: Add separate DI file
 //TODO: Add try catch in program.cs with logging
-//TODO: models as records
-//TODO: Add separate project for DI for repo
 //TODO: Add advertisment to frontend
 //TODO: Add SEO meta tags to frontend and other stuff (see nemestats repo)
 //TODO: Add payment system to frontend and backend
+//TODO: Add email confirmation system to backend and frontend
+//TODO: Add forgot password system to backend and frontend
+//TODO: Add email notification system to backend and frontend
+//TODO: Add Cloudflare ddos and caching to frontend and backend - free
+//TODO: Add Azure Front Door to frontend and backend maybe???? - costs
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 ConfigurationManager configuration = builder.Configuration;
+
+// Add services to the container.
+builder.Services.AddProjectServices();
 
 builder.Services.AddControllers();
 
@@ -47,10 +50,6 @@ builder.Services.AddCors(options =>
                 .AllowCredentials();
         });
 });
-
-builder.Services.AddScoped<IJwtService, JwtService>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-
 
 //
 // AUTHENTICATION
@@ -109,36 +108,12 @@ builder.Services.AddAuthentication(options =>
 //
 builder.Services.AddAuthorization();
 
-//
-// SERVICES
-//
-builder.Services.AddScoped<IPasswordService, PasswordService>();
-
-builder.Services.AddScoped<IJwtService, JwtService>();
-
-builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
-
-builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
-
-//
-// REPOSITORIES
-//
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-
-builder.Services.AddScoped<IRoleRepository, RoleRepository>();
-
-builder.Services.AddScoped<ITokenRepository, TokenRepository>();
-
-builder.Services.AddScoped<ISessionRepository, SessionRepository>();
-
-//
-// ADMIN SEEDER
-//
-builder.Services.AddScoped<IAdminSeederService, AdminSeederService>();
+builder.ConfigureSerilog();
 
 WebApplication app = builder.Build();
 
-// Configure the HTTP request pipeline.
+app.UseSerilogRequestLogging();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -161,6 +136,7 @@ app.UseAuthorization();
 //
 app.MapControllers();
 
+//TODO: Optional seed
 //
 // ADMIN SEED
 //

@@ -2,18 +2,11 @@
 
 namespace XpBro.Api.Services;
 
-public sealed class CurrentUserService : ICurrentUserService
+public sealed class CurrentUserService(IHttpContextAccessor http) : ICurrentUserService
 {
-    private readonly IHttpContextAccessor _http;
-
-    public CurrentUserService(IHttpContextAccessor http)
-    {
-        _http = http;
-    }
-
     public Guid UserId()
     {
-        string? value = _http.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        string? value = http.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -25,7 +18,7 @@ public sealed class CurrentUserService : ICurrentUserService
 
     public string Email()
     {
-        string? value = _http.HttpContext?.User.FindFirstValue(ClaimTypes.Email);
+        string? value = http.HttpContext?.User.FindFirstValue(ClaimTypes.Email);
 
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -37,6 +30,6 @@ public sealed class CurrentUserService : ICurrentUserService
 
     public bool IsAuthenticated()
     {
-        return _http.HttpContext?.User.Identity?.IsAuthenticated ?? false;
+        return http.HttpContext?.User.Identity?.IsAuthenticated ?? false;
     }
 }

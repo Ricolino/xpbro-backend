@@ -1,6 +1,6 @@
 ﻿namespace XpBro.Api.Dtos;
 
-public sealed class SessionResponse
+public sealed record SessionResponse
 {
     public Guid Id { get; set; }
 

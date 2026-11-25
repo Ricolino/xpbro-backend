@@ -1,4 +1,4 @@
-﻿namespace XpBro.Api.Repositories;
+﻿namespace XpBro.RepoInterfaces;
 
 public interface IRoleRepository
 {

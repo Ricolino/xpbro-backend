@@ -1,42 +1,30 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using XpBro.Api.Dtos;
-using XpBro.Api.Models;
-using XpBro.Api.Repositories;
 using XpBro.Api.Services;
+using XpBro.Models.Domain;
+using XpBro.RepoInterfaces;
 
 namespace XpBro.Api.Controllers;
 
 [Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/users")]
-public sealed class UsersController : ControllerBase
+public sealed class UsersController(
+    IUserRepository users,
+    IRoleRepository roles,
+    IPasswordService passwords,
+    ICurrentUserService currentUserService,
+    ILogger<UsersController> logger) : ControllerBase
 {
-    private readonly IUserRepository _users;
-    private readonly IRoleRepository _roles;
-    private readonly IPasswordService _passwords;
-    private readonly ICurrentUserService _currentUserService;
-
-    public UsersController(
-        IUserRepository users,
-        IRoleRepository roles,
-        IPasswordService passwords,
-        ICurrentUserService currentUserService)
-    {
-        _users = users;
-        _roles = roles;
-        _passwords = passwords;
-        _currentUserService = currentUserService;
-    }
-
     [HttpGet]
     public async Task<ActionResult<List<UserListItemResponse>>> GetUsers()
     {
-        List<User> users = await _users.GetAll();
+        List<User> allUsers = await users.GetAll();
 
-        Dictionary<Guid, List<string>> roleMap = await _roles.GetRolesForUsers(users.Select(x => x.Id));
+        Dictionary<Guid, List<string>> roleMap = await roles.GetRolesForUsers(allUsers.Select(x => x.Id));
 
-        List<UserListItemResponse> result = users.ConvertAll(
+        List<UserListItemResponse> result = allUsers.ConvertAll(
                 user => new UserListItemResponse
                 {
                     Id = user.Id,
@@ -45,7 +33,7 @@ public sealed class UsersController : ControllerBase
                     LastName = user.LastName,
                     IsActive = user.IsActive,
                     EmailConfirmed = user.EmailConfirmed,
-                    Roles = roleMap.TryGetValue(user.Id, out var roles) ? roles : []
+                    Roles = roleMap.TryGetValue(user.Id, out var userRoles) ? userRoles : []
                 });
 
         return Ok(result);
@@ -54,14 +42,12 @@ public sealed class UsersController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<UserListItemResponse>> GetUser(Guid id)
     {
-        User? user = await _users.GetById(id);
+        User? user = await users.GetById(id);
 
         if (user == null)
         {
             return NotFound();
         }
-
-        List<string> roles = await _roles.GetRoles(user.Id);
 
         return Ok(new UserListItemResponse
         {
@@ -71,14 +57,14 @@ public sealed class UsersController : ControllerBase
             LastName = user.LastName,
             IsActive = user.IsActive,
             EmailConfirmed = user.EmailConfirmed,
-            Roles = roles
+            Roles = await roles.GetRoles(user.Id)
         });
     }
 
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateUser(Guid id, UpdateUserRequest request)
     {
-        User? user = await _users.GetById(id);
+        User? user = await users.GetById(id);
 
         if (user == null)
         {
@@ -89,9 +75,9 @@ public sealed class UsersController : ControllerBase
 
         user.LastName = request.LastName.Trim();
 
-        await _users.Update(user);
+        await users.Update(user);
 
-        await _users.UpdateEmail(user.Id, request.Email.Trim());
+        await users.UpdateEmail(user.Id, request.Email.Trim());
 
         return Ok();
     }
@@ -99,7 +85,7 @@ public sealed class UsersController : ControllerBase
     [HttpPut("{id:guid}/enable")]
     public async Task<IActionResult> EnableUser(Guid id)
     {
-        await _users.Enable(id);
+        await users.Enable(id);
 
         return Ok();
     }
@@ -107,12 +93,12 @@ public sealed class UsersController : ControllerBase
     [HttpPut("{id:guid}/disable")]
     public async Task<IActionResult> DisableUser(Guid id)
     {
-        if (await _roles.HasRole(id, "Admin"))
+        if (await roles.HasRole(id, "Admin"))
         {
             return BadRequest("Cannot disable admin user.");
         }
 
-        await _users.Disable(id);
+        await users.Disable(id);
 
         return Ok();
     }
@@ -120,7 +106,7 @@ public sealed class UsersController : ControllerBase
     [HttpPost("{id:guid}/roles")]
     public async Task<IActionResult> AssignRole(Guid id, AssignRoleRequest request)
     {
-        await _roles.AssignRole(id, request.Role);
+        await roles.AssignRole(id, request.Role);
 
         return Ok();
     }
@@ -129,7 +115,7 @@ public sealed class UsersController : ControllerBase
     "{id:guid}/roles/{role}")]
     public async Task<IActionResult> RemoveRole(Guid id, string role)
     {
-        await _roles.RemoveRole(id, role);
+        await roles.RemoveRole(id, role);
 
         return Ok();
     }
@@ -138,16 +124,16 @@ public sealed class UsersController : ControllerBase
     "{id:guid}/reset-password")]
     public async Task<IActionResult> ResetPassword(Guid id, ResetPasswordRequest request)
     {
-        User? user = await _users.GetById(id);
+        User? user = await users.GetById(id);
 
         if (user == null)
         {
             return NotFound();
         }
 
-        string hash = _passwords.Hash(request.NewPassword);
+        string hash = passwords.Hash(request.NewPassword);
 
-        await _users.UpdatePassword(id, hash);
+        await users.UpdatePassword(id, hash);
 
         return Ok();
     }
@@ -155,34 +141,32 @@ public sealed class UsersController : ControllerBase
     [HttpGet("{id:guid}/roles")]
     public async Task<ActionResult<List<string>>> GetRoles(Guid id)
     {
-        List<string> roles = await _roles.GetRoles(id);
-
-        return Ok(roles);
+        return Ok(await roles.GetRoles(id));
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteUser(Guid id)
     {
-        User? user = await _users.GetById(id);
+        User? user = await users.GetById(id);
 
         if (user == null)
         {
             return NotFound();
         }
 
-        if (id == _currentUserService.UserId())
+        if (id == currentUserService.UserId())
         {
             return BadRequest("Cannot delete yourself.");
         }
 
-        bool isAdmin = await _roles.HasRole(id, "Admin");
+        bool isAdmin = await roles.HasRole(id, "Admin");
 
-        if (isAdmin && await _roles.CountUsersInRole("Admin") == 1)
+        if (isAdmin && await roles.CountUsersInRole("Admin") == 1)
         {
             return BadRequest("Last admin cannot be deleted.");
         }
 
-        await _users.Delete(id);
+        await users.Delete(id);
 
         return NoContent();
     }

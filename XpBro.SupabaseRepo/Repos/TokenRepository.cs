@@ -1,16 +1,13 @@
-﻿using Npgsql;
-using XpBro.Api.Models;
+﻿using Microsoft.Extensions.Configuration;
+using Npgsql;
+using XpBro.Models.Domain;
+using XpBro.RepoInterfaces;
 
-namespace XpBro.Api.Repositories;
+namespace XpBro.SupabaseRepo.Repos;
 
-public sealed class TokenRepository : ITokenRepository
+public sealed class TokenRepository(IConfiguration configuration) : ITokenRepository
 {
-    private readonly string _connectionString;
-
-    public TokenRepository(IConfiguration configuration)
-    {
-        _connectionString = configuration.GetConnectionString("Db")!;
-    }
+    private readonly string _connectionString = configuration.GetConnectionString("Db")!;
 
     private NpgsqlConnection CreateConnection()
     {
@@ -189,20 +186,5 @@ public sealed class TokenRepository : ITokenRepository
     """;
 
         await command.ExecuteNonQueryAsync();
-    }
-
-    private static bool IsValid(RefreshToken token)
-    {
-        if (token.RevokedAt != null)
-        {
-            return false;
-        }
-
-        if (token.ExpiresAt < DateTime.UtcNow)
-        {
-            return false;
-        }
-
-        return true;
     }
 }

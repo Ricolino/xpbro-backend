@@ -1,6 +1,6 @@
-﻿using XpBro.Api.Models;
+﻿using XpBro.Models.Domain;
 
-namespace XpBro.Api.Repositories;
+namespace XpBro.RepoInterfaces;
 
 public interface ITokenRepository
 {

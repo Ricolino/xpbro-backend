@@ -1,6 +1,6 @@
 ﻿namespace XpBro.Api.Dtos;
 
-public sealed class UpdateProfileRequest
+public sealed record UpdateProfileRequest
 {
     public string FirstName { get; set; } = "";
 

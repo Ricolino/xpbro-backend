@@ -1,6 +1,6 @@
 ﻿namespace XpBro.Api.Dtos;
 
-public sealed class UserListItemResponse
+public sealed record UserListItemResponse
 {
     public Guid Id { get; set; }
 

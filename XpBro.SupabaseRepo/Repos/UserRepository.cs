@@ -1,16 +1,13 @@
-﻿using Npgsql;
-using XpBro.Api.Models;
+﻿using Microsoft.Extensions.Configuration;
+using Npgsql;
+using XpBro.Models.Domain;
+using XpBro.RepoInterfaces;
 
-namespace XpBro.Api.Repositories;
+namespace XpBro.SupabaseRepo.Repos;
 
-public sealed class UserRepository : IUserRepository
+public sealed class UserRepository(IConfiguration configuration) : IUserRepository
 {
-    private readonly string _connectionString;
-
-    public UserRepository(IConfiguration configuration)
-    {
-        _connectionString = configuration.GetConnectionString("Db")!;
-    }
+    private readonly string _connectionString = configuration.GetConnectionString("Db")!;
 
     private NpgsqlConnection CreateConnection()
     {
@@ -89,7 +86,7 @@ public sealed class UserRepository : IUserRepository
 
     public async Task<List<User>> GetAll()
     {
-        var users = new List<User>();
+        List<User> users = [];
 
         await using var connection = CreateConnection();
 
@@ -333,7 +330,7 @@ public sealed class UserRepository : IUserRepository
         where r.name = 'Admin'
         """;
 
-        var result = (long)(await command.ExecuteScalarAsync())!;
+        long result = (long)(await command.ExecuteScalarAsync())!;
 
         return result > 0;
     }

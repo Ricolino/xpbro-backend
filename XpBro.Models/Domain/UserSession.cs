@@ -1,4 +1,4 @@
-﻿namespace XpBro.Api.Models;
+﻿namespace XpBro.Models.Domain;
 
 public sealed class UserSession
 {

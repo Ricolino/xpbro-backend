@@ -1,6 +1,6 @@
 ﻿namespace XpBro.Api.Dtos;
 
-public sealed class ResetPasswordRequest
+public sealed record ResetPasswordRequest
 {
     public string NewPassword { get; set; } = "";
 }

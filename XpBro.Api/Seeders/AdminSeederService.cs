@@ -1,36 +1,19 @@
-﻿using XpBro.Api.Models;
-using XpBro.Api.Repositories;
-using XpBro.Api.Services;
+﻿using XpBro.Api.Services;
+using XpBro.Models.Domain;
+using XpBro.RepoInterfaces;
 
 namespace XpBro.Api.Seeders;
 
-public sealed class AdminSeederService : IAdminSeederService
+public sealed class AdminSeederService(
+    IUserRepository users,
+    IRoleRepository roles,
+    IPasswordService passwords,
+    IConfiguration configuration,
+    ILogger<AdminSeederService> logger) : IAdminSeederService
 {
-    private readonly IUserRepository _users;
-    private readonly IRoleRepository _roles;
-    private readonly IPasswordService _passwords;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<AdminSeederService> _logger;
-
-    public AdminSeederService(
-        IUserRepository users,
-        IRoleRepository roles,
-        IPasswordService passwords,
-        IConfiguration configuration,
-        ILogger<AdminSeederService> logger)
-    {
-        _users = users;
-        _roles = roles;
-        _passwords = passwords;
-        _configuration = configuration;
-        _logger = logger;
-    }
-
     public async Task Seed()
     {
-        const string adminEmail = "admin@xpbro.com";
-
-        if(await _users.AnyAdminsExist())
+        if (await users.AnyAdminsExist())
         {
             return;
         }
@@ -38,18 +21,18 @@ public sealed class AdminSeederService : IAdminSeederService
         User admin = new()
         {
             Id = Guid.NewGuid(),
-            Email = _configuration["SeedAdmin:Email"]!,
-            PasswordHash = _passwords.Hash(_configuration["SeedAdmin:Password"]!),
-            FirstName = _configuration["SeedAdmin:FirstName"]!,
-            LastName = _configuration["SeedAdmin:LastName"]!,
+            Email = configuration["SeedAdmin:Email"]!,
+            PasswordHash = passwords.Hash(configuration["SeedAdmin:Password"]!),
+            FirstName = configuration["SeedAdmin:FirstName"]!,
+            LastName = configuration["SeedAdmin:LastName"]!,
             EmailConfirmed = true,
             IsActive = true
         };
 
-        await _users.Create(admin);
+        await users.Create(admin);
 
-        await _roles.AssignRole(admin.Id, "Admin");
+        await roles.AssignRole(admin.Id, "Admin");
 
-        _logger.LogInformation("Default admin created.");
+        logger.LogInformation("Default admin created.");
     }
 }

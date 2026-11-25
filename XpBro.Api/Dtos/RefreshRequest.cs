@@ -1,6 +1,6 @@
 ﻿namespace XpBro.Api.Dtos
 {
-    public class RefreshRequest
+    public sealed record RefreshRequest
     {
     }
 }
