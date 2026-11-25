@@ -6,6 +6,8 @@ public static class ApplicationExtension
 {
     public static void ConfigureSerilog(this WebApplicationBuilder builder)
     {
+        builder.Logging.ClearProviders();
+
         builder.Host.UseSerilog((context, services, loggerConfiguration) =>
         {
             loggerConfiguration

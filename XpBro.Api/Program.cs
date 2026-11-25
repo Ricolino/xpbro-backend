@@ -112,7 +112,23 @@ builder.ConfigureSerilog();
 
 WebApplication app = builder.Build();
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        // Extract IP address (proxy/load balancer through X-Forwarded-For)
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString();
+        if (httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor))
+        {
+            ip = forwardedFor.FirstOrDefault();
+        }
+
+        diagnosticContext.Set("ClientIp", ip);
+        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+    };
+});
 
 if (app.Environment.IsDevelopment())
 {
