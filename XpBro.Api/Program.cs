@@ -8,7 +8,7 @@ using XpBro.Api.Seeders;
 
 //TODO: Fix Login method (email/pass or google) in db for google
 //TODO: What is and where is Account Type - Standard in db
-//TODO: Add Azure logging maybe
+//TODO: Add Azure Insights (with daily limit) maybe
 //TODO: Add try catch in program.cs with logging
 //TODO: Add advertisment to frontend
 //TODO: Add SEO meta tags to frontend and other stuff (see nemestats repo)
