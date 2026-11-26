@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Npgsql;
-using XpBro.Models.Domain;
+using XpBro.Models.Auth;
 using XpBro.RepoInterfaces;
 
 namespace XpBro.SupabaseRepo.Repos;

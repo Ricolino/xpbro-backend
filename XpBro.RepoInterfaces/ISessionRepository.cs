@@ -1,4 +1,4 @@
-﻿using XpBro.Models.Domain;
+﻿using XpBro.Models.Auth;
 
 namespace XpBro.RepoInterfaces;
 

@@ -1,4 +1,4 @@
-﻿namespace XpBro.Models.Domain;
+﻿namespace XpBro.Models.Auth;
 
 public sealed class RefreshToken
 {

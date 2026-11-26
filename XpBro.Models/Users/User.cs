@@ -1,4 +1,4 @@
-﻿namespace XpBro.Models.Domain;
+﻿namespace XpBro.Models.Users;
 
 public sealed class User
 {
