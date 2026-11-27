@@ -24,48 +24,34 @@ public sealed class GamesRepository(IConfiguration configuration) : IGamesReposi
 
         command.CommandText =
         """
-        insert into xpbro.games
+        INSERT INTO xpbro.games
         (
             id,
-            email,
-            password_hash,
-            google_id,
-            first_name,
-            last_name,
-            email_confirmed,
-            is_active
+            platform_id,
+            external_game_id,
+            name,
+            image_url,
+            metadata
         )
-        values
+        VALUES
         (
             @id,
-            @email,
-            @passwordHash,
-            @googleId,
-            @firstName,
-            @lastName,
-            @emailConfirmed,
-            @isActive
+            @platformId,
+            @externalGameId,
+            @name,
+            @imageUrl,
+            @metadata
         )
         """;
 
         command.Parameters.AddWithValue("id", game.Id);
-
-        command.Parameters.AddWithValue("email", game.Email);
-
-        command.Parameters.AddWithValue("passwordHash", (object?)game.PasswordHash ?? DBNull.Value);
-
-        command.Parameters.AddWithValue("googleId", (object?)game.GoogleId ?? DBNull.Value);
-
-        command.Parameters.AddWithValue("firstName", game.FirstName);
-
-        command.Parameters.AddWithValue("lastName", game.LastName);
-
-        command.Parameters.AddWithValue("emailConfirmed", game.EmailConfirmed);
-
-        command.Parameters.AddWithValue("isActive", game.IsActive);
+        command.Parameters.AddWithValue("platformId", game.PlatformId);
+        command.Parameters.AddWithValue("externalGameId", game.ExternalGameId);
+        command.Parameters.AddWithValue("name", game.Name);
+        command.Parameters.AddWithValue("imageUrl", (object?)game.ImageUrl ?? DBNull.Value);
+        command.Parameters.AddWithValue("metadata", NpgsqlTypes.NpgsqlDbType.Jsonb, game.Metadata);
 
         await command.ExecuteNonQueryAsync();
-
 
         throw new NotImplementedException();
     }

@@ -1,5 +1,5 @@
 ﻿using XpBro.Api.Services;
-using XpBro.Models.User;
+using XpBro.Models.Users;
 using XpBro.RepoInterfaces;
 
 namespace XpBro.Api.Seeders;

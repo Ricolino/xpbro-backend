@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using XpBro.Api.Dtos;
 using XpBro.Api.Services;
 using XpBro.Models.Auth;
-using XpBro.Models.User;
+using XpBro.Models.Users;
 using XpBro.RepoInterfaces;
 
 namespace XpBro.Api.Controllers;

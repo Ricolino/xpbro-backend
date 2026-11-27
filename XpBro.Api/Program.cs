@@ -18,6 +18,9 @@ using XpBro.Api.Seeders;
 //TODO: Add email notification system to backend and frontend
 //TODO: Add Cloudflare ddos and caching to frontend and backend - free
 //TODO: Add Azure Front Door to frontend and backend maybe???? - costs
+//TODO: Add something instead of NotImplementedException everywhere
+
+//TODO: Read platforms table and use it in static class for platform ids and names at startup
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
