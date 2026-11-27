@@ -1,0 +1,611 @@
+-- =====================================================
+-- XPBRO DATABASE V2
+-- IDEMPOTENT
+-- SUPABASE / POSTGRESQL
+-- =====================================================
+
+create extension if not exists pgcrypto;
+create extension if not exists citext;
+
+create schema if not exists xpbro;
+
+-- =====================================================
+-- FUNCTIONS
+-- =====================================================
+
+create or replace function xpbro.update_updated_at_column()
+returns trigger
+language plpgsql
+as
+$$
+begin
+    new.updated_at = now();
+    return new;
+end;
+$$;
+
+-- =====================================================
+-- USERS
+-- =====================================================
+
+create table if not exists xpbro.users
+(
+    id uuid primary key
+        default gen_random_uuid(),
+
+    email citext not null unique,
+
+    password_hash text,
+
+    google_id varchar(255),
+
+    first_name varchar(100) not null,
+
+    last_name varchar(100) not null,
+
+    email_confirmed boolean not null
+        default false,
+
+    is_active boolean not null
+        default true,
+
+    created_at timestamptz not null
+        default now(),
+
+    updated_at timestamptz not null
+        default now()
+);
+
+drop trigger if exists trg_users_updated_at
+on xpbro.users;
+
+create trigger trg_users_updated_at
+before update
+on xpbro.users
+for each row
+execute function xpbro.update_updated_at_column();
+
+-- =====================================================
+-- ROLES
+-- =====================================================
+
+create table if not exists xpbro.roles
+(
+    id serial primary key,
+
+    name varchar(50) not null unique,
+
+    description varchar(255),
+
+    created_at timestamptz not null
+        default now()
+);
+
+-- =====================================================
+-- USER ROLES
+-- =====================================================
+
+create table if not exists xpbro.user_roles
+(
+    user_id uuid not null,
+
+    role_id integer not null,
+
+    assigned_at timestamptz not null
+        default now(),
+
+    primary key(user_id, role_id),
+
+    constraint fk_user_roles_user
+        foreign key(user_id)
+        references xpbro.users(id)
+        on delete cascade,
+
+    constraint fk_user_roles_role
+        foreign key(role_id)
+        references xpbro.roles(id)
+        on delete cascade
+);
+
+-- =====================================================
+-- REFRESH TOKENS
+-- =====================================================
+
+create table if not exists xpbro.refresh_tokens
+(
+    id uuid primary key
+        default gen_random_uuid(),
+
+    user_id uuid not null,
+
+    token text not null unique,
+
+    expires_at timestamptz not null,
+
+    created_at timestamptz not null
+        default now(),
+
+    revoked_at timestamptz,
+
+    replaced_by_token text,
+
+    constraint fk_refresh_tokens_user
+        foreign key(user_id)
+        references xpbro.users(id)
+        on delete cascade
+);
+
+-- =====================================================
+-- EMAIL VERIFICATION TOKENS
+-- =====================================================
+
+create table if not exists xpbro.email_verification_tokens
+(
+    id uuid primary key
+        default gen_random_uuid(),
+
+    user_id uuid not null,
+
+    token uuid not null
+        default gen_random_uuid(),
+
+    created_at timestamptz not null
+        default now(),
+
+    expires_at timestamptz not null,
+
+    used_at timestamptz,
+
+    constraint uq_email_verification_token
+        unique(token),
+
+    constraint fk_email_verification_user
+        foreign key(user_id)
+        references xpbro.users(id)
+        on delete cascade
+);
+
+-- =====================================================
+-- PASSWORD RESET TOKENS
+-- =====================================================
+
+create table if not exists xpbro.password_reset_tokens
+(
+    id uuid primary key
+        default gen_random_uuid(),
+
+    user_id uuid not null,
+
+    token uuid not null
+        default gen_random_uuid(),
+
+    created_at timestamptz not null
+        default now(),
+
+    expires_at timestamptz not null,
+
+    used_at timestamptz,
+
+    constraint uq_password_reset_token
+        unique(token),
+
+    constraint fk_password_reset_user
+        foreign key(user_id)
+        references xpbro.users(id)
+        on delete cascade
+);
+
+-- =====================================================
+-- USER SESSIONS
+-- =====================================================
+
+create table if not exists xpbro.user_sessions
+(
+    id uuid primary key
+        default gen_random_uuid(),
+
+    user_id uuid not null,
+
+    refresh_token_id uuid,
+
+    ip_address varchar(100),
+
+    user_agent text,
+
+    created_at timestamptz not null
+        default now(),
+
+    last_seen_at timestamptz not null
+        default now(),
+
+    revoked_at timestamptz,
+
+    constraint fk_sessions_user
+        foreign key(user_id)
+        references xpbro.users(id)
+        on delete cascade,
+
+    constraint fk_sessions_refresh
+        foreign key(refresh_token_id)
+        references xpbro.refresh_tokens(id)
+        on delete set null
+);
+
+-- =====================================================
+-- AUDIT LOGS
+-- =====================================================
+
+create table if not exists xpbro.audit_logs
+(
+    id bigint generated always as identity primary key,
+
+    user_id uuid,
+
+    action varchar(100) not null,
+
+    entity varchar(100) not null,
+
+    entity_id varchar(100) not null,
+
+    details jsonb,
+
+    created_at timestamptz not null
+        default now(),
+
+    constraint fk_audit_user
+        foreign key(user_id)
+        references xpbro.users(id)
+        on delete set null
+);
+
+-- =====================================================
+-- INDEXES
+-- =====================================================
+
+create index if not exists ix_users_email
+    on xpbro.users(email);
+
+create index if not exists ix_refresh_tokens_user
+    on xpbro.refresh_tokens(user_id);
+
+create index if not exists ix_refresh_tokens_token
+    on xpbro.refresh_tokens(token);
+
+create index if not exists ix_user_roles_user
+    on xpbro.user_roles(user_id);
+
+create index if not exists ix_user_roles_role
+    on xpbro.user_roles(role_id);
+
+create index if not exists ix_email_verification_token
+    on xpbro.email_verification_tokens(token);
+
+create index if not exists ix_email_verification_user
+    on xpbro.email_verification_tokens(user_id);
+
+create index if not exists ix_password_reset_token
+    on xpbro.password_reset_tokens(token);
+
+create index if not exists ix_password_reset_user
+    on xpbro.password_reset_tokens(user_id);
+
+create index if not exists ix_sessions_user
+    on xpbro.user_sessions(user_id);
+
+create index if not exists ix_audit_user
+    on xpbro.audit_logs(user_id);
+
+-- =====================================================
+-- DEFAULT ROLES
+-- =====================================================
+
+insert into xpbro.roles
+(
+    name,
+    description
+)
+values
+(
+    'Admin',
+    'System administrator'
+),
+(
+    'Manager',
+    'Business manager'
+),
+(
+    'User',
+    'Standard application user'
+)
+on conflict(name)
+do nothing;
+
+
+
+
+-- =====================================================
+-- 1. PLATFORMS
+-- Supported gaming platforms
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS xpbro.platforms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(50) NOT NULL UNIQUE,
+
+    auth_type VARCHAR(30) NOT NULL DEFAULT 'public',
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT platforms_auth_type_check
+        CHECK (auth_type IN (
+            'public',
+            'openid',
+            'oauth2',
+            'api_key',
+            'manual'
+        ))
+);
+
+
+-- =====================================================
+-- 2. USER_PLATFORMS
+-- External accounts connected by users
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS xpbro.user_platforms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    user_id UUID NOT NULL
+        REFERENCES xpbro.users(id) ON DELETE CASCADE,
+
+    platform_id UUID NOT NULL
+        REFERENCES xpbro.platforms(id) ON DELETE RESTRICT,
+
+    external_user_id VARCHAR(255),
+    external_username VARCHAR(255),
+
+    access_token TEXT,
+    refresh_token TEXT,
+    token_expires_at TIMESTAMPTZ,
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- =====================================================
+-- 3. GAMES
+-- Games catalog
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS xpbro.games (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    platform_id UUID NOT NULL
+        REFERENCES xpbro.platforms(id) ON DELETE RESTRICT,
+
+    external_game_id VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+
+    image_url TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT games_platform_external_id_unique
+        UNIQUE (platform_id, external_game_id)
+);
+
+-- =====================================================
+-- 3. USER GAMES COLLECTION
+-- User games collection
+-- =====================================================
+
+
+CREATE TABLE IF NOT EXISTS xpbro.user_games (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    user_id UUID NOT NULL 
+        REFERENCES xpbro.users(id) ON DELETE CASCADE,
+        
+    game_id UUID NOT NULL 
+        REFERENCES xpbro.games(id) ON DELETE CASCADE,
+    
+    playtime_minutes INT NOT NULL DEFAULT 0,
+    status VARCHAR(30) NOT NULL DEFAULT 'unplayed',
+    favorite BOOLEAN NOT NULL DEFAULT FALSE,
+    
+    added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT user_game_unique UNIQUE (user_id, game_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_games_user_id ON xpbro.user_games(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_games_game_id ON xpbro.user_games(game_id);
+
+-- =====================================================
+-- 4. GAME_STATS
+-- User statistics per game
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS xpbro.game_stats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    user_platform_id UUID NOT NULL
+        REFERENCES xpbro.user_platforms(id) ON DELETE CASCADE,
+
+    game_id UUID NOT NULL
+        REFERENCES xpbro.games(id) ON DELETE RESTRICT,
+
+    playtime_minutes BIGINT NOT NULL DEFAULT 0,
+
+    matches_played INTEGER NOT NULL DEFAULT 0,
+    wins INTEGER NOT NULL DEFAULT 0,
+    losses INTEGER NOT NULL DEFAULT 0,
+
+    extra_data JSONB NOT NULL DEFAULT '{}'::JSONB,
+
+    last_synced_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT game_stats_user_game_unique
+        UNIQUE (user_platform_id, game_id),
+
+    CONSTRAINT game_stats_non_negative_check
+        CHECK (
+            playtime_minutes >= 0
+            AND matches_played >= 0
+            AND wins >= 0
+            AND losses >= 0
+        )
+);
+
+
+-- =====================================================
+-- 5. PLATFORM_SYNC_LOGS
+-- Synchronization history and monitoring
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS xpbro.platform_sync_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    user_platform_id UUID NOT NULL
+        REFERENCES xpbro.user_platforms(id) ON DELETE CASCADE,
+
+    sync_type VARCHAR(50) NOT NULL DEFAULT 'full',
+
+    status VARCHAR(20) NOT NULL DEFAULT 'running',
+
+    games_processed INTEGER NOT NULL DEFAULT 0,
+    stats_updated INTEGER NOT NULL DEFAULT 0,
+
+    error_message TEXT,
+
+    metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
+
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ,
+
+    duration_ms BIGINT,
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT platform_sync_logs_status_check
+        CHECK (status IN (
+            'running',
+            'success',
+            'partial',
+            'failed'
+        )),
+
+    CONSTRAINT platform_sync_logs_type_check
+        CHECK (sync_type IN (
+            'full',
+            'games',
+            'stats',
+            'achievements',
+            'profile'
+        )),
+
+    CONSTRAINT platform_sync_logs_non_negative_check
+        CHECK (
+            games_processed >= 0
+            AND stats_updated >= 0
+            AND (duration_ms IS NULL OR duration_ms >= 0)
+        ),
+
+    CONSTRAINT platform_sync_logs_finished_check
+        CHECK (
+            finished_at IS NULL
+            OR finished_at >= started_at
+        )
+);
+
+
+-- =====================================================
+-- 6. INDEXES
+-- =====================================================
+
+-- USER_PLATFORMS
+
+CREATE INDEX IF NOT EXISTS idx_user_platforms_user_id
+    ON xpbro.user_platforms(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_platforms_platform_id
+    ON xpbro.user_platforms(platform_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_platforms_external_user_id
+    ON xpbro.user_platforms(external_user_id);
+
+
+-- GAMES
+
+CREATE INDEX IF NOT EXISTS idx_games_platform_id
+    ON xpbro.games(platform_id);
+
+CREATE INDEX IF NOT EXISTS idx_games_name
+    ON xpbro.games(name);
+
+
+-- GAME_STATS
+
+CREATE INDEX IF NOT EXISTS idx_game_stats_user_platform_id
+    ON xpbro.game_stats(user_platform_id);
+
+CREATE INDEX IF NOT EXISTS idx_game_stats_game_id
+    ON xpbro.game_stats(game_id);
+
+CREATE INDEX IF NOT EXISTS idx_game_stats_last_synced_at
+    ON xpbro.game_stats(last_synced_at);
+
+CREATE INDEX IF NOT EXISTS idx_game_stats_extra_data
+    ON xpbro.game_stats USING GIN(extra_data);
+
+
+-- PLATFORM_SYNC_LOGS
+
+CREATE INDEX IF NOT EXISTS idx_platform_sync_logs_user_platform_id
+    ON xpbro.platform_sync_logs(user_platform_id);
+
+CREATE INDEX IF NOT EXISTS idx_platform_sync_logs_status
+    ON xpbro.platform_sync_logs(status);
+
+CREATE INDEX IF NOT EXISTS idx_platform_sync_logs_started_at
+    ON xpbro.platform_sync_logs(started_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_platform_sync_logs_latest
+    ON xpbro.platform_sync_logs(
+        user_platform_id,
+        started_at DESC
+    );
+
+
+-- =====================================================
+-- 7. INITIAL PLATFORMS
+-- =====================================================
+
+INSERT INTO xpbro.platforms (name, slug, auth_type)
+VALUES
+    ('Steam', 'steam', 'openid'),
+    ('Epic Games', 'epic', 'public'),
+    ('Board Game Arena', 'bga', 'manual'),
+    ('BoardGameGeek', 'bgg', 'public')
+ON CONFLICT (slug) DO NOTHING;
+
+
+
+
+
+-- =====================================================
+-- END
+-- =====================================================

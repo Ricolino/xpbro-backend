@@ -9,4 +9,6 @@ public interface IPlatformsRepository
     Task<Platform> GetPlatformBySlug(string slug);
 
     Task<Guid> GetPlatformIdBySlug(string slug);
+
+    Task<string> GetExternalUserName(Guid userId, Guid platformId);
 }

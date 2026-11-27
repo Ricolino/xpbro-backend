@@ -1,6 +1,8 @@
 ﻿using XpBro.Api.Seeders;
 using XpBro.Api.Services;
 using XpBro.RepoInterfaces;
+using XpBro.SupabaseRepo.Games;
+using XpBro.SupabaseRepo.Platforms;
 using XpBro.SupabaseRepo.Repos;
 
 namespace XpBro.Api;
@@ -27,6 +29,8 @@ public static class DependencyInjectionConfig
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<ITokenRepository, TokenRepository>();
         services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddScoped<IGamesRepository, GamesRepository>();
+        services.AddScoped<IPlatformsRepository, PlatformsRepository>();
 
         //
         // ADMIN SEEDER
